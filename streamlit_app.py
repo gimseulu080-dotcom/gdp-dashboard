@@ -1,151 +1,47 @@
 import streamlit as st
-import pandas as pd
-import math
-from pathlib import Path
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+# 웹 페이지 제목 설정
+st.title("🌌 일반 상대성 이론: 톨만 온도 시뮬레이터")
+st.markdown("---")
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# 1. 사용자에게 아는지 모르는지 질문 (라디오 버튼)
+st.subheader("자, 우리는 톨만 온도에 대해서 알아볼겁니다.")
+answer = st.radio("혹시 톨만 온도에 대해서 아시나요?", ["선택하세요", "Yes", "No"], index=0)
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+st.markdown("---")
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+# 2. 조건문 처리
+if answer == "No":
+    st.info("💡 **톨만 온도(Tolman temperature)란?**")
+    st.write("중력이 존재한다면 열평형이 되기 위해서 각 지점의 온도가 달라져야 한다는 것을 의미합니다.")
+    st.write("상대성 이론에 의하면, **중력이 강한 곳은 시간이 느리게 갑니다.**")
+    st.write("시간이 느리다면 분자들의 움직임, 즉 에너지가 감소할 것이고 그에 따라 그 곳의 국소 온도도 낮아질 것입니다.")
+    st.write("따라서 열평형을 맞추기 위해 낮아진 국소 온도를 올려야겠죠. 이것이 톨만 온도입니다.")
+    st.success("이제 개념을 이해하셨다면 위의 질문을 **'Yes'**로 바꾸고 계산을 해볼까요?")
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+elif answer == "Yes":
+    st.subheader("🧮 톨만 온도 계산기")
+    
+    # 숫자 입력창 (기본값 10km)
+    rs = st.number_input("사건의 지평선 반지름은 몇 km인가요? (정수 입력)", min_value=1, value=10, step=1)
+    
+    # 계산 실행 버튼
+    if st.button("온도 조사하기"):
+        temper = []
+        distance = []
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+        # 기존 로직대로 계산
+        for r in range(rs + 2, rs + 22):
+            tem = rs / r
+            temper.append(tem)
+            distance.append(r)
+        
+        st.write(f"🔍 **사건의 지평선 반지름이 {rs}km일 때, {rs+2}km부터 {rs+22}km까지의 톨만 온도 조사 결과입니다.**")
+        st.write("")
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
-
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
-
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+        # 결과를 보기 좋게 출력 (2열 레이아웃이나 표로 만들어도 좋지만, 기존 코드 스타일을 살려 출력합니다)
+        for i in range(20):
+            st.write(f"📍 **{i+1}번 지점** | 거리: `{distance[i]}km` ➡️ 온도: `{temper[i]:.2f}°C` ")
+        
+        st.markdown("---")
+        st.success("✨ 이렇듯 톨만 온도는 **가장 가까운 지점에서 제일 높고, 가장 먼 곳에서 제일 낮다**는 사실을 알 수 있습니다!")
